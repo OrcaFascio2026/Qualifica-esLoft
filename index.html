@@ -414,26 +414,26 @@ function renderChart(){
       }]
     },
     options:{
-      indexAxis:'y',
       responsive:true,
       maintainAspectRatio:false,
       plugins:{
         legend:{display:false},
         tooltip:{
           callbacks:{
-            label:c=>`  ${c.parsed.x} lead${c.parsed.x!==1?'s':''}`
+            label:c=>`  ${c.parsed.y} lead${c.parsed.y!==1?'s':''}`
           }
         }
       },
       scales:{
         x:{
-          ticks:{color:'#888',stepSize:1,precision:0},
-          grid:{color:'#2e2e2e'},
+          ticks:{color:'#e8e8e8',font:{size:11},maxRotation:30,minRotation:0},
+          grid:{display:false},
           border:{color:'#3a3a3a'}
         },
         y:{
-          ticks:{color:'#e8e8e8',font:{size:12}},
-          grid:{display:false},
+          beginAtZero:true,
+          ticks:{color:'#888',stepSize:1,precision:0},
+          grid:{color:'#2e2e2e'},
           border:{color:'#3a3a3a'}
         }
       }
