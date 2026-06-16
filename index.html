@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Leads Descartados</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --bg:#0f0f0f;
+  --surface:#1a1a1a;
+  --surface2:#222222;
+  --surface3:#2a2a2a;
+  --border:#2e2e2e;
+  --border2:#3a3a3a;
+  --text:#e8e8e8;
+  --muted:#888;
+  --muted2:#555;
+  --green:#00d084;
+  --green-dim:#00d08422;
+  --red:#ff4d6d;
+  --red-dim:#ff4d6d22;
+  --blue:#4f9cf9;
+  --blue-dim:#4f9cf922;
+  --purple:#a78bfa;
+  --purple-dim:#a78bfa22;
+  --amber:#f59e0b;
+  --amber-dim:#f59e0b22;
+  --accent:#3b82f6;
+  --radius:10px;
+}
+
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  min-height:100vh;
+  font-size:14px;
+}
+
+/* ── topbar ── */
+.topbar{
+  background:var(--surface);
+  border-bottom:1px solid var(--border);
+  padding:0 1.5rem;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  height:54px;
+  position:sticky;top:0;z-index:50;
+}
+.brand{
+  font-size:16px;font-weight:700;
+  color:var(--green);
+  display:flex;align-items:center;gap:6px;
+}
+.brand span{font-size:18px}
+.topbar-right{display:flex;align-items:center;gap:10px}
+.status-pill{
+  display:flex;align-items:center;gap:6px;
+  background:var(--surface2);
+  border:1px solid var(--border2);
+  border-radius:20px;padding:5px 12px;
+  font-size:12px;color:var(--muted);
+}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--muted2);flex-shrink:0;transition:background .3s}
+.dot.online{background:var(--green)}
+.dot.offline{background:var(--red)}
+
+/* ── nav ── */
+.nav{
+  background:var(--surface);
+  border-bottom:1px solid var(--border);
+  padding:0 1.5rem;
+  display:flex;gap:0;
+}
+.nav-btn{
+  padding:12px 18px;font-size:13px;font-weight:500;
+  color:var(--muted);border:none;background:none;
+  cursor:pointer;border-bottom:2px solid transparent;
+  transition:color .15s,border-color .15s;font-family:inherit;
+}
+.nav-btn.active{color:var(--green);border-bottom-color:var(--green)}
+.nav-btn:hover:not(.active){color:var(--text)}
+
+/* ── page ── */
+.page{max-width:1200px;margin:0 auto;padding:1.5rem}
+
+/* ── month selector ── */
+.page-header{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:1.5rem;flex-wrap:wrap;gap:10px;
+}
+.month-select{
+  background:var(--surface2);border:1px solid var(--border2);
+  color:var(--text);border-radius:var(--radius);
+  padding:8px 32px 8px 12px;font-size:13px;font-family:inherit;
+  cursor:pointer;appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 10px center;
+}
+.btn-primary{
+  display:inline-flex;align-items:center;gap:6px;
+  background:var(--green);color:#0f0f0f;border:none;
+  border-radius:var(--radius);padding:9px 16px;
+  font-size:13px;font-weight:600;cursor:pointer;
+  font-family:inherit;transition:opacity .15s;white-space:nowrap;
+}
+.btn-primary:hover{opacity:.88}
+.btn-primary:disabled{opacity:.4;cursor:default}
+
+.btn-export{
+  display:inline-flex;align-items:center;gap:6px;
+  background:transparent;color:var(--green);
+  border:1px solid var(--green);
+  border-radius:var(--radius);padding:9px 16px;
+  font-size:13px;font-weight:600;cursor:pointer;
+  font-family:inherit;transition:all .15s;white-space:nowrap;
+}
+.btn-export:hover{background:var(--green);color:#0f0f0f}
+
+/* ── metric cards ── */
+.metrics{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+  gap:12px;margin-bottom:1.5rem;
+}
+.metric{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:1rem 1.25rem;
+  border-top:2px solid transparent;
+  position:relative;overflow:hidden;
+}
+.metric.green{border-top-color:var(--green)}
+.metric.red{border-top-color:var(--red)}
+.metric.blue{border-top-color:var(--blue)}
+.metric.purple{border-top-color:var(--purple)}
+.metric.amber{border-top-color:var(--amber)}
+.metric-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:8px}
+.metric-val{font-size:22px;font-weight:700;line-height:1.1}
+.metric.green .metric-val{color:var(--green)}
+.metric.red   .metric-val{color:var(--red)}
+.metric.blue  .metric-val{color:var(--blue)}
+.metric.purple .metric-val{color:var(--purple)}
+.metric.amber  .metric-val{color:var(--amber)}
+
+/* ── grid layout ── */
+.grid2{display:grid;grid-template-columns:1fr 340px;gap:1.25rem;align-items:start}
+@media(max-width:900px){.grid2{grid-template-columns:1fr}}
+
+/* ── card ── */
+.card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  overflow:hidden;
+}
+.card-header{
+  padding:1rem 1.25rem;
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.card-title{font-size:14px;font-weight:600;color:var(--text)}
+.card-body{padding:1.25rem}
+
+/* ── filter pills ── */
+.filter-pills{display:flex;gap:6px}
+.pill{
+  padding:4px 12px;border-radius:20px;font-size:12px;font-weight:500;
+  border:1px solid var(--border2);background:none;
+  color:var(--muted);cursor:pointer;font-family:inherit;
+  transition:all .15s;
+}
+.pill.active{background:var(--green);color:#0f0f0f;border-color:var(--green)}
+.pill:hover:not(.active){color:var(--text);border-color:var(--border2)}
+
+/* ── chart ── */
+.chart-wrap{position:relative;width:100%;height:220px}
+#legend{display:flex;flex-wrap:wrap;gap:8px 16px;margin-bottom:1rem;font-size:12px;color:var(--muted)}
+.li{display:flex;align-items:center;gap:5px}
+.ld{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+
+/* ── table ── */
+table{width:100%;border-collapse:collapse;table-layout:fixed}
+thead th{
+  font-size:11px;font-weight:600;text-transform:uppercase;
+  letter-spacing:.05em;color:var(--muted);
+  background:var(--surface2);padding:10px 12px;
+  border-bottom:1px solid var(--border);text-align:left;
+}
+th:nth-child(1){width:22%}
+th:nth-child(2){width:14%}
+th:nth-child(3){width:18%}
+th:nth-child(4){width:32%}
+th:nth-child(5){width:14%;text-align:center}
+
+tbody tr{border-bottom:1px solid var(--border);transition:background .1s}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover{background:var(--surface2)}
+tbody td{padding:8px 12px;vertical-align:middle}
+
+.ci,.cs{
+  width:100%;background:transparent;border:none;outline:none;
+  font-size:13px;color:var(--text);font-family:inherit;
+  padding:4px 6px;border-radius:5px;transition:background .15s;
+}
+.ci:focus,.cs:focus{background:rgba(79,156,249,.12);outline:1px solid var(--blue)}
+.ci.num{text-align:right}
+.cs{cursor:pointer}
+.cs option{background:var(--surface2);color:var(--text)}
+
+.btn-del{
+  background:none;border:none;cursor:pointer;
+  color:var(--muted2);padding:5px;border-radius:5px;
+  display:inline-flex;align-items:center;justify-content:center;
+  transition:color .15s,background .15s;
+}
+.btn-del:hover{color:var(--red);background:var(--red-dim)}
+
+.motivo-badge{
+  display:inline-block;padding:3px 8px;border-radius:4px;
+  font-size:11px;font-weight:600;
+}
+
+/* ── empty ── */
+.empty td{
+  text-align:center;padding:2.5rem;color:var(--muted2);font-size:13px;
+}
+
+/* ── nova entrada form ── */
+.form-group{margin-bottom:1rem}
+.form-label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px}
+.form-input,.form-select{
+  width:100%;background:var(--surface2);
+  border:1px solid var(--border2);color:var(--text);
+  border-radius:7px;padding:9px 12px;font-size:13px;
+  font-family:inherit;outline:none;transition:border-color .15s;
+}
+.form-input:focus,.form-select:focus{border-color:var(--blue)}
+.form-input::placeholder{color:var(--muted2)}
+.form-select option{background:var(--surface2)}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+/* ── toast ── */
+#toast{
+  position:fixed;bottom:1.5rem;right:1.5rem;
+  background:var(--surface2);border:1px solid var(--border2);
+  color:var(--text);padding:10px 16px;
+  border-radius:8px;font-size:13px;opacity:0;
+  transition:opacity .25s;pointer-events:none;z-index:99;
+  box-shadow:0 4px 20px rgba(0,0,0,.5);
+}
+#toast.show{opacity:1}
+
+/* ── scrollbar ── */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:var(--surface)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+</style>
+</head>
+<body>
+
+<!-- topbar -->
+<div class="topbar">
+  <div class="brand"><span>🏠</span> Leads</div>
+  <div class="topbar-right">
+    <div class="status-pill">
+      <span class="dot" id="status-dot"></span>
+      <span id="status-txt">Conectando…</span>
+    </div>
+  </div>
+</div>
+
+<!-- nav -->
+<div class="nav">
+  <button class="nav-btn active">Dashboard</button>
+  <button class="nav-btn">Relatórios</button>
+  <button class="nav-btn">Configurações</button>
+</div>
+
+<div class="page">
+
+  <!-- header -->
+  <div class="page-header">
+    <select class="month-select" id="month-sel" onchange="filterMonth()">
+      <option value="">Todos os meses</option>
+    </select>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn-export" onclick="exportExcel()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        Exportar Excel
+      </button>
+      <button class="btn-primary" id="btn-add" onclick="openForm()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Novo lead
+      </button>
+    </div>
+  </div>
+
+  <!-- metrics -->
+  <div class="metrics">
+    <div class="metric green">
+      <div class="metric-label">Total de leads</div>
+      <div class="metric-val" id="m-total">—</div>
+    </div>
+    <div class="metric red">
+      <div class="metric-label">Valor total</div>
+      <div class="metric-val" id="m-total-val">—</div>
+    </div>
+    <div class="metric blue">
+      <div class="metric-label">Valor médio</div>
+      <div class="metric-val" id="m-avg">—</div>
+    </div>
+    <div class="metric purple">
+      <div class="metric-label">Principal motivo</div>
+      <div class="metric-val" id="m-top" style="font-size:13px;padding-top:4px">—</div>
+    </div>
+    <div class="metric amber">
+      <div class="metric-label">Este mês</div>
+      <div class="metric-val" id="m-month">—</div>
+    </div>
+  </div>
+
+  <!-- main grid -->
+  <div class="grid2">
+
+    <!-- esquerda: tabela -->
+    <div>
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Lançamentos</span>
+          <div class="filter-pills">
+            <button class="pill active" onclick="setFilter('todos',this)">Todos</button>
+            <button class="pill" onclick="setFilter('Preço alto',this)">Preço</button>
+            <button class="pill" onclick="setFilter('Sem crédito',this)">Crédito</button>
+            <button class="pill" onclick="setFilter('Sem interesse',this)">Interesse</button>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Nome do lead</th>
+              <th>Data</th>
+              <th>Valor do imóvel</th>
+              <th>Motivo do descarte</th>
+              <th>Ação</th>
+            </tr>
+          </thead>
+          <tbody id="tbody">
+            <tr class="empty"><td colspan="5">Conectando ao banco de dados…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- direita: form + gráfico -->
+    <div style="display:flex;flex-direction:column;gap:1.25rem">
+
+      <!-- form novo lead -->
+      <div class="card" id="form-card" style="display:none">
+        <div class="card-header">
+          <span class="card-title">Novo lead</span>
+          <button onclick="closeForm()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1">×</button>
+        </div>
+        <div class="card-body">
+          <div class="form-group">
+            <label class="form-label">Nome do lead</label>
+            <input class="form-input" id="f-nome" placeholder="ex: João Silva…" />
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Valor do imóvel (R$)</label>
+              <input class="form-input" id="f-valor" type="number" placeholder="0,00" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Data</label>
+              <input class="form-input" id="f-data" type="date" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Motivo do descarte</label>
+            <select class="form-select" id="f-motivo"></select>
+          </div>
+          <button class="btn-primary" style="width:100%;justify-content:center;margin-top:4px" onclick="saveLead()">
+            Adicionar
+          </button>
+        </div>
+      </div>
+
+      <!-- gráfico -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Motivos de descarte</span>
+        </div>
+        <div class="card-body">
+          <div id="legend"></div>
+          <div class="chart-wrap">
+            <canvas id="chart" role="img" aria-label="Gráfico de rosca com distribuição dos motivos de descarte">Distribuição dos motivos de descarte.</canvas>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ================================================================
+   CONFIGURAÇÃO SUPABASE
+   Painel Supabase → Settings → API
+   ================================================================ */
+const SUPABASE_URL  = 'https://fvnskaqfoaxxoidtzmnu.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ2bnNrYXFmb2F4eG9pZHR6bW51Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2MDkzNTgsImV4cCI6MjA5NzE4NTM1OH0.pL7ql3DFKz8uIknwVxlex6_O8pDL0UyCF0VcuUB_Xtc';
+const TABLE         = 'leads';
+/* ============================================================== */
+
+const MOTIVOS = [
+  'Preço alto','Sem crédito','Sem interesse',
+  'Comprou com outro','Sem contato','Outro'
+];
+
+const PALETTE = {
+  'Preço alto':        '#4f9cf9',
+  'Sem crédito':       '#00d084',
+  'Sem interesse':     '#ff4d6d',
+  'Comprou com outro': '#a78bfa',
+  'Sem contato':       '#f59e0b',
+  'Outro':             '#555'
+};
+
+let leads = [];
+let filtered = [];
+let activeFilter = 'todos';
+let chartObj = null;
+
+/* ── helpers ── */
+const $ = id => document.getElementById(id);
+const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const today = () => new Date().toISOString().split('T')[0];
+const fmtBRL = v => 'R$ ' + Math.round(v||0).toLocaleString('pt-BR');
+
+function toast(msg, ms=2500){
+  const t=$('toast'); t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),ms);
+}
+
+/* ── Supabase REST ── */
+const SB_HEADERS = {
+  'apikey': SUPABASE_ANON,
+  'Authorization': `Bearer ${SUPABASE_ANON}`,
+  'Content-Type': 'application/json',
+  'Prefer': 'return=representation'
+};
+async function sbFetch(path, opts={}) {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, { headers: SB_HEADERS, ...opts });
+  if (!r.ok) throw new Error(await r.text());
+  return r.status===204 ? null : r.json();
+}
+
+async function loadAll() {
+  leads = await sbFetch(`${TABLE}?select=*&order=created_at.asc`);
+  applyFilter(); render(); buildMonthSelect(); setStatus(true);
+}
+
+/* ── form ── */
+function openForm(){
+  const fc = $('form-card');
+  fc.style.display = fc.style.display==='none' ? 'block' : 'none';
+  $('f-data').value = today();
+}
+function closeForm(){ $('form-card').style.display='none' }
+
+window.saveLead = async () => {
+  const nome   = $('f-nome').value.trim();
+  const valor  = parseFloat($('f-valor').value)||0;
+  const data   = $('f-data').value||today();
+  const motivo = $('f-motivo').value;
+  if (!nome){ toast('Insira o nome do lead'); return; }
+  const btn = document.querySelector('#form-card .btn-primary');
+  btn.disabled=true;
+  try {
+    const [row] = await sbFetch(TABLE, {
+      method:'POST',
+      body: JSON.stringify({ nome, valor, data, motivo })
+    });
+    leads.push(row);
+    applyFilter(); render(); buildMonthSelect();
+    $('f-nome').value=''; $('f-valor').value='';
+    toast('Lead adicionado ✓');
+    closeForm();
+  } catch(e){ toast('Erro: '+e.message, 4000); }
+  finally{ btn.disabled=false; }
+};
+
+/* ── update / delete ── */
+window.updateField = async (id, field, rawVal) => {
+  const value = field==='valor' ? (parseFloat(rawVal)||0) : rawVal;
+  const idx = leads.findIndex(l=>l.id===id);
+  if(idx===-1)return;
+  leads[idx][field]=value;
+  applyFilter(); renderMetrics(); renderChart();
+  try {
+    await sbFetch(`${TABLE}?id=eq.${id}`, { method:'PATCH', body: JSON.stringify({[field]:value}) });
+  } catch(e){ toast('Erro ao salvar: '+e.message,4000); }
+};
+
+window.deleteLead = async (id) => {
+  if(!confirm('Remover este lead?'))return;
+  leads = leads.filter(l=>l.id!==id);
+  applyFilter(); render(); buildMonthSelect();
+  try {
+    await sbFetch(`${TABLE}?id=eq.${id}`, { method:'DELETE' });
+    toast('Lead removido ✓');
+  } catch(e){ toast('Erro ao remover: '+e.message,4000); }
+};
+
+/* ── filter ── */
+window.setFilter = (f, btn) => {
+  activeFilter=f;
+  document.querySelectorAll('.pill').forEach(p=>p.classList.remove('active'));
+  btn.classList.add('active');
+  applyFilter(); renderTable();
+};
+
+function applyFilter(){
+  if(activeFilter==='todos') filtered=[...leads];
+  else filtered=leads.filter(l=>l.motivo===activeFilter);
+  const ms=$('month-sel').value;
+  if(ms) filtered=filtered.filter(l=>(l.data||'').startsWith(ms));
+}
+
+window.filterMonth=()=>{ applyFilter(); render(); };
+
+function buildMonthSelect(){
+  const months=[...new Set(leads.map(l=>(l.data||'').slice(0,7)).filter(Boolean))].sort();
+  const sel=$('month-sel');
+  const cur=sel.value;
+  sel.innerHTML='<option value="">Todos os meses</option>';
+  months.forEach(m=>{
+    const [y,mo]=m.split('-');
+    const label=new Date(y,mo-1).toLocaleString('pt-BR',{month:'long',year:'numeric'});
+    sel.innerHTML+=`<option value="${m}"${m===cur?' selected':''}>${label.charAt(0).toUpperCase()+label.slice(1)}</option>`;
+  });
+}
+
+/* ── status ── */
+function setStatus(ok){
+  $('status-dot').className='dot '+(ok?'online':'offline');
+  $('status-txt').textContent=ok?'Conectado · ao vivo':'Sem conexão';
+}
+
+/* ── render ── */
+function render(){ renderMetrics(); renderTable(); renderChart(); }
+
+function renderMetrics(){
+  const src=filtered.length?filtered:leads;
+  $('m-total').textContent=filtered.length;
+  const tot=filtered.reduce((s,l)=>s+(l.valor||0),0);
+  $('m-total-val').textContent=fmtBRL(tot);
+  const avg=filtered.length?tot/filtered.length:0;
+  $('m-avg').textContent=fmtBRL(avg);
+  const cnt={};
+  filtered.forEach(l=>cnt[l.motivo]=(cnt[l.motivo]||0)+1);
+  const top=Object.entries(cnt).sort((a,b)=>b[1]-a[1])[0];
+  $('m-top').textContent=top?top[0]:'—';
+  const thisMonth=new Date().toISOString().slice(0,7);
+  $('m-month').textContent=leads.filter(l=>(l.data||'').startsWith(thisMonth)).length;
+}
+
+function renderTable(){
+  const tb=$('tbody'); tb.innerHTML='';
+  if(!filtered.length){
+    tb.innerHTML='<tr class="empty"><td colspan="5">Nenhum lead encontrado.</td></tr>';
+    return;
+  }
+  [...filtered].reverse().forEach(l=>{
+    const color=PALETTE[l.motivo]||'#555';
+    const tr=document.createElement('tr');
+    tr.innerHTML=`
+      <td><input class="ci" value="${esc(l.nome)}" onblur="updateField(${l.id},'nome',this.value)"/></td>
+      <td><input class="ci" type="date" value="${l.data||''}" onchange="updateField(${l.id},'data',this.value)"/></td>
+      <td><input class="ci num" type="number" value="${l.valor||0}" onblur="updateField(${l.id},'valor',this.value)"/></td>
+      <td>
+        <select class="cs" onchange="updateField(${l.id},'motivo',this.value)">
+          ${MOTIVOS.map(m=>`<option value="${m}"${m===l.motivo?' selected':''}>${m}</option>`).join('')}
+        </select>
+      </td>
+      <td style="text-align:center">
+        <button class="btn-del" onclick="deleteLead(${l.id})" title="Remover">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/>
+          </svg>
+        </button>
+      </td>`;
+    tb.appendChild(tr);
+  });
+}
+
+function renderChart(){
+  const cnt={};
+  MOTIVOS.forEach(m=>cnt[m]=0);
+  filtered.forEach(l=>{ if(l.motivo in cnt)cnt[l.motivo]++;else cnt[l.motivo]=(cnt[l.motivo]||0)+1; });
+  const labels=Object.keys(cnt).filter(k=>cnt[k]>0);
+  const data=labels.map(k=>cnt[k]);
+  const colors=labels.map(l=>PALETTE[l]||'#555');
+
+  $('legend').innerHTML=labels.map((l,i)=>
+    `<span class="li"><span class="ld" style="background:${colors[i]}"></span>${l} (${data[i]})</span>`
+  ).join('');
+
+  if(chartObj)chartObj.destroy();
+  chartObj=new Chart($('chart').getContext('2d'),{
+    type:'doughnut',
+    data:{
+      labels,
+      datasets:[{
+        data,backgroundColor:colors,
+        borderWidth:2,borderColor:'#1a1a1a',hoverOffset:8
+      }]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,cutout:'62%',
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{label:c=>` ${c.label}: ${c.parsed} lead${c.parsed!==1?'s':''}`}}
+      }
+    }
+  });
+}
+
+/* ── populate motivo select ── */
+const fmot=$('f-motivo');
+MOTIVOS.forEach(m=>{ const o=document.createElement('option'); o.value=m; o.textContent=m; fmot.appendChild(o); });
+
+/* ── polling 10s ── */
+setInterval(async()=>{
+  try{
+    const data=await sbFetch(`${TABLE}?select=*&order=created_at.asc`);
+    if(JSON.stringify(data)!==JSON.stringify(leads)){
+      leads=data; applyFilter(); render(); buildMonthSelect();
+    }
+    setStatus(true);
+  }catch{ setStatus(false); }
+},10000);
+
+/* ── exportar Excel ── */
+window.exportExcel = () => {
+  if(!filtered.length){ toast('Nenhum dado para exportar'); return; }
+
+  const rows = filtered.map(l => ({
+    'Nome do Lead':     l.nome   || '',
+    'Data':             l.data   || '',
+    'Valor do Imóvel':  l.valor  || 0,
+    'Motivo do Descarte': l.motivo || ''
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+
+  /* larguras das colunas */
+  ws['!cols'] = [
+    { wch: 28 },
+    { wch: 14 },
+    { wch: 18 },
+    { wch: 24 }
+  ];
+
+  /* aba de resumo por motivo */
+  const cnt = {};
+  MOTIVOS.forEach(m => cnt[m] = 0);
+  filtered.forEach(l => { if(l.motivo) cnt[l.motivo] = (cnt[l.motivo]||0) + 1; });
+  const resumoRows = Object.entries(cnt)
+    .filter(([,v]) => v > 0)
+    .map(([motivo, total]) => ({ 'Motivo': motivo, 'Quantidade': total }));
+
+  const ws2 = XLSX.utils.json_to_sheet(resumoRows);
+  ws2['!cols'] = [{ wch: 24 }, { wch: 12 }];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws,  'Leads');
+  XLSX.utils.book_append_sheet(wb, ws2, 'Resumo por Motivo');
+
+  const mes = $('month-sel').value;
+  const sufixo = mes ? `_${mes}` : '';
+  XLSX.writeFile(wb, `leads_descartados${sufixo}.xlsx`);
+  toast('Excel exportado ✓');
+};
+
+/* ── boot ── */
+loadAll().catch(()=>{
+  setStatus(false);
+  $('tbody').innerHTML='<tr class="empty"><td colspan="5">⚠️ Configure SUPABASE_URL e SUPABASE_ANON_KEY no código.</td></tr>';
+  leads=[]; filtered=[]; render();
+});
+</script>
+</body>
+</html>
